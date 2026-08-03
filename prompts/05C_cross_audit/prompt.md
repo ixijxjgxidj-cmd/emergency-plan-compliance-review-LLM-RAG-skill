@@ -46,8 +46,10 @@
 1. `reference` 能否在 `law_metadata.json` 中按 `law_name` 精确匹配到一条记录？
 2. 该记录的 `usable_for_review` 是否为 `true`？
 3. `article` 是否为具体条号，`clause_text` 是否 ≥30 字且能在知识库中找到对应原文？
+4. `quoted_text`（错误原文）是否非空、≥10 字，且能在该 `clause_id` 的条款原文中精确匹配？
+5. `suggestion` 是否非空且为法律层面的修订方向？
 
-**三项全过 → 进入合并流程。任一不过 → 移出问题清单**，写入 `./output/rejected_problems.json`，记 `reject_reason`（`reference_not_in_kb` / `law_unusable` / `no_article` / `no_clause_text` / `text_not_found_in_kb`），并同步在 `kb_gap_report.json` 中登记一条依据缺口。
+**五项全过 → 进入合并流程。任一不过 → 移出问题清单**，写入 `./output/rejected_problems.json`，记 `reject_reason`（`reference_not_in_kb` / `law_unusable` / `no_article` / `no_clause_text` / `text_not_found_in_kb` / `no_quoted_text` / `quoted_text_not_in_plan` / `no_suggestion`），并同步在 `kb_gap_report.json` 中登记一条依据缺口。
 
 被移出的问题**不占用 `P-` 编号**，不进入 `review_results.json`，不流向 5D/5E/6/7。
 

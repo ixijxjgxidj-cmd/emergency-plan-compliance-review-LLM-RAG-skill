@@ -37,6 +37,7 @@
 14. **聚合规范终审**：同一 `rule_id` + 同一 `type` + 同一 `reference` 的问题是否出现多个编号。若同一检查点在多个条款上被拆成多个问题编号 → 判为聚合失效，列入 `final_audit_report` 要求 5C 重新聚合。
 15. **修订建议完备性**：每个 fail 问题是否有非空 `suggestion`。缺失即判为字段不完整。
 16. **依据缺口交叉核对**：`kb_gap_report.json` 中的 `blocked_checkpoints` 是否与最终问题清单互斥——同一检查点不应既"因无依据被阻断"又"产生了问题"。冲突项列入 `final_audit_report`。
+17. **错误原文终审**：每个 fail 问题的 `quoted_text` 是否非空（≥10 字）、是否能在对应 `clause_id` 的条款原文中精确匹配。空值或匹配不上 → 判为不可交付（Agent8 无法据此锚定批注），列入 `final_audit_report` 要求退回补齐。
 
 ## 禁止
 

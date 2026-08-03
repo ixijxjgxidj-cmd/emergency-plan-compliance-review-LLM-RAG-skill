@@ -48,7 +48,7 @@
 - `pending_resolution`：对"标记待复核"的最终裁定（保留 / 剔除 / 转人工；不适用填 null）
 - `supplemental_evidence`
 - `citation_check`：每个问题的 `law_name_match`、`article_match`、`text_match`（true/false/uncertain），以及 `reference_in_kb`（`reference` 能否在 `law_metadata.json` 中精确匹配）
-- `field_check`：`article_present`、`suggestion_present`、`description_is_substantive`（描述是否写清"预案怎么写的/法定怎么要求的/差在哪"，而非仅罗列触发条件）
+- `field_check`：`article_present`、`suggestion_present`、`quoted_text_present`、`quoted_text_matches_plan`（错误原文能否在条款原文中精确匹配）、`description_is_substantive`（描述是否写清"预案怎么写的/法定怎么要求的/差在哪"，而非仅罗列触发条件）
 - `retrieval_log`（Top20）
 
 ## 字段级复核（实跑暴露的失效点，必查）
