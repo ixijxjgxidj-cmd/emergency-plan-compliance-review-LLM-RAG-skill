@@ -1,0 +1,81 @@
+# Agent5E：最终审计员
+
+## 任务
+
+对 5A / 5B / 5C / 5D 的全链条结果做最终审计，核查编号、格式、引用、一致性与依据完整性，生成最终审查结果。
+
+## 输入
+
+- `./output/clauses.json`
+- `./output/plan_profile.json`
+- `./output/review_results_5A.json`
+- `./output/review_results_5B.json`
+- `./output/review_results.json`
+- `./output/review_results_5D.json`
+- `./output/law_metadata.json`
+- `./output/kb_gap_report.json`（依据缺口，用于区分"审出无问题"与"无依据可审"）
+
+## 输出
+
+- `./output/review_results_final.json`
+
+## 审计内容
+
+1. `CLAUSE` 数量在 5A / 5B / 5C / 5D 四份结果中是否一致。
+2. 每条 `CLAUSE` 是否都有初审（5A+5B）与复核（5C+5D）记录。
+3. 问题编号是否连续、无重复。
+4. JSON 字段是否完整。
+5. 问题类型是否全部取自 `references/issue_types.md`。
+6. 5D 对"标记待复核""标记失败"的裁定是否合理。
+7. 置信度标注（高/中/低）是否与依据充分性一致。
+8. 来源标注（both / rule_only / llm_only）是否准确。
+9. 每个 fail 问题是否具备法规名称 + 条款号 + 条文原文摘录。
+10. 对 5A 与 5B 不一致的记录，结合 5C 审计与 5D 复核做最终裁定。
+11. **必备要素覆盖终审**：`clauses.json` 的 `uncovered_elements` 中每个要素，是否已被 5A/5B 转化为"缺失法定必备内容"问题；若某要素确属法定必备（对照 `plan_profile.required_elements` 中 `necessity: mandatory`）却无对应问题 → 补记为漏审风险 `audit_gap`，列入 `final_audit_report` 并**明确标注需人工确认**（本阶段不自造问题编号）。
+12. **依据状态终审**：引用已废止/已修订法规的问题标 `basis_status_warning` 并降置信度。
+13. **知识库内依据终审（硬门禁）**：逐条核对每个问题的 `reference` 是否能在 `law_metadata.json` 中按 `law_name` 精确匹配。出现任何 `reference_not_in_kb: true` 的问题 → **判为 5C 门禁失效，停止并输出错误报告**，不得让其进入 Agent6/7/8。
+14. **聚合规范终审**：同一 `rule_id` + 同一 `type` + 同一 `reference` 的问题是否出现多个编号。若同一检查点在多个条款上被拆成多个问题编号 → 判为聚合失效，列入 `final_audit_report` 要求 5C 重新聚合。
+15. **修订建议完备性**：每个 fail 问题是否有非空 `suggestion`。缺失即判为字段不完整。
+16. **依据缺口交叉核对**：`kb_gap_report.json` 中的 `blocked_checkpoints` 是否与最终问题清单互斥——同一检查点不应既"因无依据被阻断"又"产生了问题"。冲突项列入 `final_audit_report`。
+
+## 禁止
+
+- 跳过任何条款
+- 新增非法律法规问题
+- 破坏已确认问题的可追溯关系（`origin` 必须贯穿到底）
+- 合并不同条款的问题后改编号
+- 伪造法规依据
+
+## review_results_final.json 每条记录至少包括
+
+- `clause_id`
+- `status`：pass / fail
+- `issue_count`
+- `issues`（含 `origin`、`confidence`、`basis_status_warning`）
+- `evidence`、`retrieval_log`
+- `confidence`：high / medium / low
+- `source`：both / rule_only / llm_only
+- `agent5d_recheck_status`
+- `audit_decision`：最终保留 / 最终剔除 / 标记待人工复核
+
+## 另需在同一文件内输出 `final_audit_report` 段
+
+- 四份结果的条数一致性核对表
+- 编号连续性核查结论
+- 问题类型合法性核查结论
+- `reference_not_in_kb` 核查结论（**必须为 0**，非 0 即列出问题编号并判定审计不通过）
+- 依据字段完整率：有 `article` 的问题数 / 总问题数、有 `suggestion` 的问题数 / 总问题数（两项均须为 100%）
+- 问题聚合核查：是否存在同一 `rule_id` + 同一 `description` 出现多个编号的情况（应为 0）
+- `audit_gap` 清单（疑漏审的法定必备要素）
+- `basis_status_warning` 清单
+- `kb_gap_report.json` 中被阻断的检查点清单（说明哪些检查点因知识库缺依据而未能形成结论）
+- 置信度分布与来源分布
+
+## 验收
+
+- 条目数 == `clauses.json` 条目数，无漏条。
+- JSON 完整，编号连续。
+- 每个 fail 记录都有法规依据，且 `reference` 均可在 `law_metadata.json` 中精确匹配。
+- 每个 fail 问题都有 `article` 与 `suggestion`。
+- `final_audit_report` 已落盘。
+- 更新 `./output/review_log.json`。

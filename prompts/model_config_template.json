@@ -1,0 +1,17 @@
+{
+  "_comment": "模型配置模板 — 执行 Agent5B 前由用户确认后写入 ./output/model_config.json",
+  "_usage": "不要把真实 api_key 提交到版本库；可改用环境变量 EPCR_API_KEY 并在运行时注入",
+  "model_provider": "your-provider-name",
+  "base_url": "https://your-api-endpoint/v1",
+  "api_key": "YOUR_API_KEY_HERE",
+  "model_name": "your-model-name",
+  "concurrency": "serial",
+  "batch_size": 1,
+  "topk": 15,
+  "temperature": 0.3,
+  "max_tokens": 4000,
+  "retry_count": 3,
+  "retry_delay_seconds": 3,
+  "batch_delay_seconds": 0.5,
+  "supports_web_search": null
+}

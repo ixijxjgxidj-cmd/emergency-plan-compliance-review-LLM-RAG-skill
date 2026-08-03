@@ -1,0 +1,38 @@
+# Local source documents and review inputs
+laws/*
+!laws/.gitkeep
+plan/*
+!plan/.gitkeep
+
+# Generated outputs
+output/*
+!output/.gitkeep
+chroma_db/
+
+# Generated scripts and knowledge-base docs from Agent3
+build_kb.py
+query_kb.py
+README_KB.md
+
+# Packaging artifacts
+dist/
+*.zip
+
+# Python/runtime caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+model_config.json
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
