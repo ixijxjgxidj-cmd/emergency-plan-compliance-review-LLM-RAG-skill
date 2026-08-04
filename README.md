@@ -17,7 +17,10 @@
 
 ---
 ## 快速开始
-
+### 0.安装
+```
+https://github.com/ixijxjgxidj-cmd/emergency-plan-compliance-review-LLM-RAG-skill帮我安装好这套工作流skill
+```
 ### 1. 准备资料
 （1）方法一
 ```
