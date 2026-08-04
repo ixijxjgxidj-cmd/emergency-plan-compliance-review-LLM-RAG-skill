@@ -15,7 +15,7 @@ emergency-plan-compliance-review/   ← 上传/打包这一层（zip 根目录�
 ├── AGENTS.md         ← Codex / 通用 agent 入口，内容指向本文件
 ├── CLAUDE.md         ← Claude Code 入口，内容指向本文件
 ├── references/       ← 预案类型-法规基线矩阵、问题类型清单
-├── prompts/          ← 各阶段 Agent prompt
+├── prompts/          ← 各阶段 Agent prompt（含 L0_original/ 原始链）
 ├── scripts/          ← 打包与校验脚本
 ├── laws/             ← 用户提供的法规/标准/规范文件
 ├── plan/             ← 待审预案
@@ -140,12 +140,14 @@ Agent8  成果汇总
 
 | 挡位 | 聚合 | A 级 | B 级 | 全文反证 | 实跑数据上的输出 |
 |------|------|------|------|----------|------------------|
-| L0 原始 | off | off | off | off | 52 条（复现原始结果） |
+| L0 原始 | — | — | — | — | 52 条（**改走 `prompts/L0_original/` 原始链**） |
 | L1 去重 | filter | off | off | off | 17 条主张 |
 | **L2 标注**（默认） | filter | annotate | annotate | annotate | 17 条，11 条带警示标记 |
 | L3 严格 | filter | filter | filter | filter | 6 条 |
 
 L3 = L2 中无任何标记的那部分，两者是严格包含关系。写入 `./output/review_config.json`，各阶段据此执行。
+
+**L0 不是"开关全关"，是另一条链**：直接执行 `prompts/L0_original/`（原始系统 12 个阶段 prompt，逐字节保留）。它是**危化品专用**的——无 Agent0 预案画像、规则库硬编码危化品法规名、依据可能不在 `laws/` 内、批注为原始质量。审非危化品预案不要用 L0；它的用途是复现与对照，不建议直接当交付件。
 
 **知识库越不全，越该用 L2。** 实跑那次 `laws/` 只有 9 部可用法规，A 级剔除率 24%，其中"未参照装备配备标准"一条经全文反证判定成立，却因本地缺该标准而被剔。
 

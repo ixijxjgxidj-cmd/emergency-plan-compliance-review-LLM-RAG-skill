@@ -33,6 +33,7 @@ REQUIRED_FILES = [
     "references/plan_type_matrix.md",
     "references/issue_types.md",
     "references/strictness_levels.md",
+    "prompts/L0_original/master.md",
 ]
 
 REQUIRED_PROMPTS = [
@@ -45,6 +46,22 @@ REQUIRED_PROMPTS = [
     "05B_llm_deep_review",
     "05C_cross_audit",
     "05C2_fulltext_crosscheck",
+    "05D_recheck",
+    "05E_final_audit",
+    "06_missing_basis_review",
+    "07_web_verification",
+    "08_result_summary",
+]
+
+# L0 原始链（逐字节保留的原始系统 prompt，选 L0 挡位时整链切过去）
+REQUIRED_L0_PROMPTS = [
+    "01_law_inventory",
+    "02_law_classification",
+    "03_kb_build",
+    "04_clause_split",
+    "05A_rule_screening",
+    "05B_llm_deep_review",
+    "05C_cross_audit",
     "05D_recheck",
     "05E_final_audit",
     "06_missing_basis_review",
@@ -75,6 +92,11 @@ def check_structure() -> list[str]:
         p = ROOT / "prompts" / stage / "prompt.md"
         if not p.is_file():
             errors.append(f"缺少阶段 prompt：prompts/{stage}/prompt.md")
+
+    for stage in REQUIRED_L0_PROMPTS:
+        p = ROOT / "prompts" / "L0_original" / stage / "prompt.md"
+        if not p.is_file():
+            errors.append(f"缺少 L0 原始链 prompt：prompts/L0_original/{stage}/prompt.md")
 
     # SKILL.md 必须有 frontmatter 的 name 与 description
     skill = ROOT / "SKILL.md"
