@@ -43,6 +43,7 @@ REQUIRED_PROMPTS = [
     "05A_rule_screening",
     "05B_llm_deep_review",
     "05C_cross_audit",
+    "05C2_fulltext_crosscheck",
     "05D_recheck",
     "05E_final_audit",
     "06_missing_basis_review",

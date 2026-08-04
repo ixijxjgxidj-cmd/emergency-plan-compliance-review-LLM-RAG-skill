@@ -89,6 +89,8 @@ Agent5B LLM 深度审查（逐条调用大模型 + 知识库 Top20）
    ↓
 Agent5C 交叉对比审计（5A vs 5B，查缺补漏）
    ↓
+Agent5C2 全文反证（缺失类主张放到全文范围复核，剔误报）
+   ↓
 Agent5D 交叉审计复核
    ↓
 Agent5E 最终审计
@@ -112,6 +114,7 @@ Agent8  成果汇总
 | Agent5A | `prompts/05A_rule_screening/prompt.md` |
 | Agent5B | `prompts/05B_llm_deep_review/prompt.md` |
 | Agent5C | `prompts/05C_cross_audit/prompt.md` |
+| Agent5C2 | `prompts/05C2_fulltext_crosscheck/prompt.md` |
 | Agent5D | `prompts/05D_recheck/prompt.md` |
 | Agent5E | `prompts/05E_final_audit/prompt.md` |
 | Agent6 | `prompts/06_missing_basis_review/prompt.md` |
@@ -186,6 +189,14 @@ Agent8  成果汇总
 | error | pass | 标记待复核 |
 | error | error | 标记失败 |
 
+### Agent5C2 全文反证
+
+对 5C 输出的"缺失/不明确"类问题逐条做全文反证：查该法定要素是否已在预案别处落实。三判定——`refuted`（误报剔除）/ `downgraded`（部分落实，降一档）/ `upheld`（成立，并收敛到"依法应当写在哪一条"）。
+
+**判误报的举证责任重于判成立**：必须给出落实位置的逐字原文，且通过三要件测试（同一要素 / 有约束力表述 / 法定最小内容齐备）。缺一只能降级。被剔问题移入 `refuted_problems.json` 保留可追溯，误报率 > 60% 触发告警。
+
+必须排在 5D 之前——本阶段会改锚点（`affected_clauses` 收敛），5D 才是校验锚点的那一步。输出 `./output/fulltext_crosscheck.json`。
+
 ### Agent5D 交叉审计复核
 
 逐条复核 5C 裁定，重跑 Top20 检索验证依据，对"标记待复核"给出最终裁定。输出 `./output/review_results_5D.json`。
@@ -244,6 +255,8 @@ Agent8  成果汇总
 | `./output/review_results.json` | 交叉审计结果 |
 | `./output/cross_audit_log.json` | 交叉审计日志 |
 | `./output/rejected_problems.json` | 依据不合法被移出的候选问题 |
+| `./output/fulltext_crosscheck.json` | 全文反证裁定 |
+| `./output/refuted_problems.json` | 全文反证判为误报移出的问题 |
 | `./output/review_results_5D.json` | 审计复核结果 |
 | `./output/review_results_final.json` | 最终审计结果 |
 | `./output/missing_basis.json` | 依据补强 |

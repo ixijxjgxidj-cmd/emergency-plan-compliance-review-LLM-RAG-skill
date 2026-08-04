@@ -8,6 +8,7 @@
 
 - `./output/clauses.json`
 - `./output/review_results.json`
+- `./output/fulltext_crosscheck.json`（5C2 全文反证结论；已判 `refuted` 的问题不再复核）
 - `./output/law_metadata.json`
 - `./chroma_db/`、`query_kb.py`
 

@@ -50,6 +50,8 @@ Agent5A (规则快筛，不调用 LLM)
 Agent5B (LLM 深度审查，逐条调用)
   ↓
 Agent5C (交叉对比审计)
+   ↓
+Agent5C2 (全文反证：缺失类主张的全文复核)
   ↓
 Agent5D (交叉审计复核)
   ↓
@@ -76,6 +78,7 @@ Agent8  (成果汇总)
 | Agent5A | `prompts/05A_rule_screening/prompt.md` |
 | Agent5B | `prompts/05B_llm_deep_review/prompt.md` |
 | Agent5C | `prompts/05C_cross_audit/prompt.md` |
+| Agent5C2 | `prompts/05C2_fulltext_crosscheck/prompt.md` |
 | Agent5D | `prompts/05D_recheck/prompt.md` |
 | Agent5E | `prompts/05E_final_audit/prompt.md` |
 | Agent6 | `prompts/06_missing_basis_review/prompt.md` |
@@ -112,7 +115,7 @@ Agent8  (成果汇总)
 7. **交付结果中每个问题的 `reference` 都能在 `law_metadata.json` 中精确匹配**；`reference_not_in_kb` 计数必须为 0。取不到依据的命中在 `kb_gap_report.json` 中如实呈现。
 8. **同一规则命中多条款只出一条问题**，`affected_clauses` 列出全部条款；`problems_all.json` 中不得出现描述完全相同的多条问题。
 9. 5B 判 pass 必须写明逐项核对了哪些法定要求；条款数 > 40 时必须走子智能体分批模式，且批次 `clause_id` 集合完整校验通过。
-10. 5C 输出 `cross_audit_log.json`；5D 对全部"标记待复核"给出裁定；5E 完成终审。
+10. 5C 输出 `cross_audit_log.json`；**5C2 对每个"缺失/不明确"类问题给出裁定，`refuted` 的已移出且保留在 `refuted_problems.json`**；5D 对全部"标记待复核"给出裁定；5E 完成终审。
 11. Agent6、Agent7 均不新增问题编号。
 12. Agent8 汇总后问题编号连续、结构化、可追溯，每个问题都有非空 `suggestion`，报告含"依据缺口"专节与覆盖度声明。
 

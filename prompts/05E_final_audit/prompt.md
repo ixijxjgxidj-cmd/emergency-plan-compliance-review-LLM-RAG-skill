@@ -14,6 +14,7 @@
 - `./output/review_results_5D.json`
 - `./output/law_metadata.json`
 - `./output/kb_gap_report.json`（依据缺口，用于区分"审出无问题"与"无依据可审"）
+- `./output/fulltext_crosscheck.json`、`./output/refuted_problems.json`（5C2 全文反证）
 
 ## 输出
 
@@ -37,7 +38,8 @@
 14. **聚合规范终审**：同一 `rule_id` + 同一 `type` + 同一 `reference` 的问题是否出现多个编号。若同一检查点在多个条款上被拆成多个问题编号 → 判为聚合失效，列入 `final_audit_report` 要求 5C 重新聚合。
 15. **修订建议完备性**：每个 fail 问题是否有非空 `suggestion`。缺失即判为字段不完整。
 16. **依据缺口交叉核对**：`kb_gap_report.json` 中的 `blocked_checkpoints` 是否与最终问题清单互斥——同一检查点不应既"因无依据被阻断"又"产生了问题"。冲突项列入 `final_audit_report`。
-17. **错误原文终审**：每个 fail 问题的 `quoted_text` 是否非空（≥10 字）、是否能在对应 `clause_id` 的条款原文中精确匹配。空值或匹配不上 → 判为不可交付（Agent8 无法据此锚定批注），列入 `final_audit_report` 要求退回补齐。
+17. **全文反证终审**：每个"缺失/不明确"类问题是否都有 5C2 裁定；`refuted` 的是否已移出且不在最终清单中；`upheld` 的 `affected_clauses` 是否已收敛为 `should_be_at_clause_id`；`downgraded` 的 severity 是否已降档。缺裁定的问题判为漏过 5C2，列入 `final_audit_report`。
+18. **错误原文终审**：每个 fail 问题的 `quoted_text` 是否非空（≥10 字）、是否能在对应 `clause_id` 的条款原文中精确匹配。空值或匹配不上 → 判为不可交付（Agent8 无法据此锚定批注），列入 `final_audit_report` 要求退回补齐。
 
 ## 禁止
 
