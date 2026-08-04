@@ -32,6 +32,7 @@ REQUIRED_FILES = [
     "prompts/model_config_template.json",
     "references/plan_type_matrix.md",
     "references/issue_types.md",
+    "references/strictness_levels.md",
 ]
 
 REQUIRED_PROMPTS = [

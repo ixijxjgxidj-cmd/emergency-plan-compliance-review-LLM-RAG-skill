@@ -41,6 +41,16 @@
 
 ### Step 3 依据合法性门禁（**在合并去重之前执行**）
 
+**先读 `./output/review_config.json`。** `basis_gate_a` / `basis_gate_b` 三态决定本步动作：
+
+| 取值 | 动作 |
+|------|------|
+| `off` | 不查，全部候选问题直接进 Step 4 |
+| `annotate` | 照下面的规则判定，但**不移出任何问题**，只在该问题上写 `basis_status`（`basis_outside_kb` / `citation_unverifiable` / `incomplete_fields` + 缺失字段清单） |
+| `filter` | 照下面的规则判定并移出不合格问题 |
+
+判定逻辑三态相同，只是处置不同。`annotate` 下仍须产出 `rejected_problems.json`（记录"若按 L3 会被移出的问题"），但这些问题**同时**留在 `review_results.json` 里并带标记。
+
 门禁分两级。**混用一个动作处理两种性质的缺陷，会把可修复的问题当不成立的问题扔掉**——这是上一版的实际缺陷。
 
 #### A 级：依据合法性（不过即剔除）
@@ -110,7 +120,7 @@ A 级通过后再查。这些缺陷是"判断可能对但没写全"，不是"判
 - 同一 `clause_id` + 同一 `type` + 同一 `reference`+`article` → 同一问题，保留描述更详细的一条，另一条记入 `merged_from`。
 - 同一 `clause_id` + 同一 `type` 但依据不同法规 → 两个问题，均保留。
 
-**第二层：跨条款同因归并（必做）**
+**第二层：跨条款同因归并**（`cross_clause_aggregation: filter` 时执行；`off` 时跳过本层，每条款各自保留独立编号）
 
 同一 `rule_id`（或同一 `type`+`reference`+`article` 组合）在 **3 条以上** CLAUSE 上产生实质相同的描述时，归并为**一个**问题，标 `finding_scope: systemic`，`affected_clauses` 列出全部条款号，`clause_count` 记条款数。描述改写为条款级共性表述，不再逐条重复。命中条款数不足 3 条的问题标 `finding_scope: clause_level`，字段口径一致（`affected_clauses` 仍为数组，单条款填单元素）。
 

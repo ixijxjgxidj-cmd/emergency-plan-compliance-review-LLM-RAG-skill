@@ -76,6 +76,20 @@
 
 这条路径的失败方向是安全的：检索漏召回 → 找不到别处落实 → 判"成立" → 保留了误报（噪音），而不是杀掉真问题。所以可以放心当兜底。
 
+## 挡位对处置的影响（先读 `./output/review_config.json`）
+
+`fulltext_crosscheck` 三态：
+
+| 取值 | 动作 |
+|------|------|
+| `off` | 跳过本阶段，不产出 `fulltext_crosscheck.json`（下游据 `review_config.json` 判定其缺失为合法） |
+| `annotate` | 全部裁定照做并落盘，但**不移出任何问题**：`refuted` 只在问题上写 `refuted_by` + 落实位置原文，`downgraded` 只写 `partial_coverage` 而不改 severity |
+| `filter` | `refuted` 移出清单，`downgraded` 降一档 |
+
+判定逻辑三态完全相同——**举证责任、三要件、归属收敛一个都不能因为挡位低就放松**。挡位只决定判完之后是移出还是标记。
+
+`annotate` 下仍须产出 `refuted_problems.json`（记录"若按 L3 会被移出的问题"），这些问题同时留在清单里并带 `refuted_by` 标记。
+
 ## 三判定
 
 ```

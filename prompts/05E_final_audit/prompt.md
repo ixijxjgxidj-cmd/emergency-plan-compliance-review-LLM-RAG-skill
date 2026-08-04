@@ -14,6 +14,7 @@
 - `./output/review_results_5D.json`
 - `./output/law_metadata.json`
 - `./output/kb_gap_report.json`（依据缺口，用于区分"审出无问题"与"无依据可审"）
+- `./output/review_config.json`（挡位；决定哪些审计项按"必须移出"还是"必须标注"核查）
 - `./output/fulltext_crosscheck.json`、`./output/refuted_problems.json`（5C2 全文反证）
 
 ## 输出
@@ -43,6 +44,18 @@
 16. **依据缺口交叉核对**：`kb_gap_report.json` 中的 `blocked_checkpoints` 是否与最终问题清单互斥——同一检查点不应既"因无依据被阻断"又"产生了问题"。冲突项列入 `final_audit_report`。
 17. **全文反证终审**：每个"缺失/不明确"类问题是否都有 5C2 裁定；`refuted` 的是否已移出且不在最终清单中；`upheld` 的 `affected_clauses` 是否已收敛为 `should_be_at_clause_id`；`downgraded` 的 severity 是否已降档。缺裁定的问题判为漏过 5C2，列入 `final_audit_report`。
 18. **错误原文终审**：每个 fail 问题的 `quoted_text` 是否非空（≥10 字）、是否能在对应 `clause_id` 的条款原文中精确匹配。空值或匹配不上 → 判为不可交付（Agent8 无法据此锚定批注），列入 `final_audit_report` 要求退回补齐。
+
+## 挡位对审计口径的影响
+
+先读 `review_config.json`。同一条审计项在不同挡位下的合格标准不同：
+
+| 审计项 | `filter` 挡位 | `annotate` 挡位 | `off` 挡位 |
+|--------|---------------|-----------------|------------|
+| 第 13 项（库内依据） | 最终清单中不得有库外依据 | 库外依据必须带 `basis_status` 标记 | 不查，但依据文本仍须逐字来自知识库 |
+| 第 14 项（聚合） | 同一检查点不得多编号 | 同上 | 不查（L0 本就每条款独立编号） |
+| 第 17 项（全文反证） | `refuted` 必须已移出 | `refuted` 必须带 `refuted_by` 标记且留在清单 | 不查（`fulltext_crosscheck.json` 缺失为合法） |
+
+**任何挡位下都必须核查的**：`quoted_text` 可定位性（第 18 项）、数量等式自洽、`upstream_basis_violation_alert` 已传递、漏斗数据已写入 `final_audit_report`。挡位放宽的是"是否移出"，不是"是否核查"。
 
 ## 禁止
 

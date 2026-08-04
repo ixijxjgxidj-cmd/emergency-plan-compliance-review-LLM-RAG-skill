@@ -73,6 +73,8 @@ emergency-plan-compliance-review/   ← 上传/打包这一层（zip 根目录�
 ```
 Agent0  预案画像与类型判定
    ↓
+挡位选择（默认 L2 标注档）
+   ↓
 Agent1  本地法规盘点
    ↓
 Agent2  法规分类（含与预案类型的相关性标注）
@@ -131,6 +133,23 @@ Agent8  成果汇总
 读取 `./plan/*`，判定：预案大类、事件类别、编制层级、编制主体、预案名称/版本/发布日期、章节结构。
 据 `references/plan_type_matrix.md` 生成"适用法规基线清单"与"必备要素清单"。
 输出 `./output/plan_profile.json`。类型无法唯一判定时列出候选并询问用户，不得默认按危化品处理。
+
+### 挡位选择（Agent0 之后，默认 L2）
+
+问题数的收敛来自四个独立开关：跨条款聚合、A 级依据门禁（依据是否在库）、B 级字段完备性、5C2 全文反证。挡位即这四个开关的组合，完整定义见 `references/strictness_levels.md`。
+
+| 挡位 | 聚合 | A 级 | B 级 | 全文反证 | 实跑数据上的输出 |
+|------|------|------|------|----------|------------------|
+| L0 原始 | off | off | off | off | 52 条（复现原始结果） |
+| L1 去重 | filter | off | off | off | 17 条主张 |
+| **L2 标注**（默认） | filter | annotate | annotate | annotate | 17 条，11 条带警示标记 |
+| L3 严格 | filter | filter | filter | filter | 6 条 |
+
+L3 = L2 中无任何标记的那部分，两者是严格包含关系。写入 `./output/review_config.json`，各阶段据此执行。
+
+**知识库越不全，越该用 L2。** 实跑那次 `laws/` 只有 9 部可用法规，A 级剔除率 24%，其中"未参照装备配备标准"一条经全文反证判定成立，却因本地缺该标准而被剔。
+
+**批注恒按 L3 标准取材**——带标记的问题只进候选问题附录，不进 `plan_annotated.docx`。分析产物全量，交付产物严格。
 
 ### Agent1 本地法规盘点
 
@@ -243,6 +262,7 @@ Agent8  成果汇总
 
 | 文件 | 说明 |
 |------|------|
+| `./output/review_config.json` | 审查严格度挡位配置 |
 | `./output/plan_profile.json` | 预案画像与适用法规基线 |
 | `./output/law_inventory.json` | 本地法规盘点 |
 | `./output/law_metadata.json` | 法规分类标注 |

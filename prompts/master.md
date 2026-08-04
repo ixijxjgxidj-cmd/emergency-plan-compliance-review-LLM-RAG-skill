@@ -35,6 +35,8 @@
 ```
 Agent0  (预案画像与类型判定)
   ↓
+挡位选择 ← 默认 L2 标注档；见 references/strictness_levels.md
+  ↓
 Agent1  (本地法规盘点)
   ↓
 Agent2  (法规分类)
@@ -86,6 +88,28 @@ Agent8  (成果汇总)
 | Agent8 | `prompts/08_result_summary/prompt.md` |
 
 执行任一阶段前必须先读对应 prompt，并**只**执行该阶段定义的任务。
+
+## 审查严格度挡位
+
+问题数的收敛来自四个独立机制（跨条款聚合、A 级依据门禁、B 级字段完备性、5C2 全文反证）。挡位就是这四个开关的组合，定义见 `references/strictness_levels.md`。
+
+**默认 L2 标注档**：一条问题都不删，但把依据状态与全文反证结论如实标出。选定后写入 `./output/review_config.json`：
+
+```json
+{ "strictness_level": "L2",
+  "cross_clause_aggregation": "filter",
+  "basis_gate_a": "annotate",
+  "basis_gate_b": "annotate",
+  "fulltext_crosscheck": "annotate" }
+```
+
+各阶段执行前必须读取该文件。**用户明确指定挡位时按其指定**；未指定则用 L2，并在开始时一句话告知当前挡位与可切换选项，不要反复询问。
+
+三条与挡位无关的铁律：
+
+1. `summary_report.md` 必须完整披露漏斗（各级数量与减少原因），低挡位不等于可以不告诉用户按严格标准会剩多少。
+2. 低挡位只是"不因依据在库外而移出问题"，**不代表允许凭记忆编造条文**——依据文本仍须逐字来自知识库。
+3. `plan_annotated.docx` 与 `issue_list.docx` 的批注**恒按 L3 标准取材**，带 `basis_outside_kb` / `citation_unverifiable` / `refuted_by` 标记的问题只进候选问题附录，不进批注。**分析产物全量，交付产物严格。**
 
 ## 模型配置说明
 
