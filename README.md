@@ -60,23 +60,7 @@ codex --cd emergency-plan-compliance-review --sandbox workspace-write --ask-for-
 
 ---
 
-## 打包上传
 
-```bash
-python scripts/package_skill.py
-```
-
-生成 `dist/emergency-plan-compliance-review.zip`，其**根目录直接包含 SKILL.md**，可被支持 skill 包的平台直接识别。脚本会在打包后重新读取 zip 校验入口位置——"上传后提示未找到 SKILL.md"的唯一常见原因就是入口被套进了嵌套目录。
-
-仅校验结构不打包：
-
-```bash
-python scripts/package_skill.py --check
-```
-
-默认不打包 `laws/`、`plan/`、`output/` 中的资料，需要连示例一起打包时加 `--with-samples`。
-
----
 
 ## 目录结构
 
@@ -143,7 +127,6 @@ emergency-plan-compliance-review/
 - **端到端从未实跑验证。** 已验证的只有目录结构、打包脚本、zip 根入口、L0 四份原始 prompt 的字节一致性，以及用实跑数据对 5C2 判定逻辑和新旧门禁做的**离线回放**。5C2 的 `derived.*` 补齐链路、L0 下的批注生成、子智能体派发编排都是纸面设计。
 - **整条流水线串行强依赖**：Agent0 判错类型污染下游全部阶段；Agent3 召回质量差会同时拖垮 5A 和 5B（两轨共用同一知识库，双轨设计唯一的共因失效点）。
 - **新引入的数量等式尚未实跑校验**：`raw_issues_in − a_level_rejected − b_level_rejected_after_retry − merged_pairs == final_issues`。
-- **L0 是危化品专用的**：原始 5A 的 10 条规则全部围绕危化品，审其他类型预案会大面积漏检。
 - `output/model_config.json` 会包含 API key，已在 `.gitignore` 中忽略，请勿提交。
 - Agent7 联网核验会向法规官网发起请求；无网络时相应问题标为 `unverified` 并据此降低置信度。
 
@@ -320,9 +303,6 @@ Agent8   成果汇总                 4 份交付物 + 能力边界声明
 
 `issue_list.docx` 的"错误原文""依据""改进建议"三列与同一 `problem_id` 的批注**逐字一致**。
 
-> 实跑教训：上一版批注长这样——`[合规问题 P-001] 严重度:低 置信度:medium 来源:rule_only / 问题描述: 涉及危险化学品经营/储存/使用/生产但未涉及许可、资质或安全条件要求 / 法规依据: 危险化学品安全管理条例 / 依据状态(Agent6): insufficient_basis_outside_kb / 联网核验(Agent7): unverified / 核验说明: …但该法规不在用户提供的知识库中,依据来源存疑`
->
-> 病根有四个：没有错误原文（挂整段，审阅者不知道哪句话错了）；依据只有法规名没有第X条没有条文原文；完全没有改进建议；判定标签混在正文里且直接吐英文枚举和阶段代号。
 
 ---
 
