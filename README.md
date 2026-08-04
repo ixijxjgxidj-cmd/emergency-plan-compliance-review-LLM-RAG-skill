@@ -10,6 +10,142 @@
 - 完整规则见 [SKILL.md](SKILL.md)，逐阶段规格见 [prompts/](prompts/)，挡位定义见 [references/strictness_levels.md](references/strictness_levels.md)。
 
 ---
+## 快速开始
+
+### 1. 准备资料
+（1）方法一
+```
+
+/skill emergency-plan-compliance-review 法律法规文件在“your path”（对着文件夹ctrl+shift+c，复制过来），待审查预案在“your path””，执行完这套工作流
+
+```
+进阶（如在5B深度LLM模型审核的时候想配置自己的模型）
+```
+/skill emergency-plan-compliance-review 等级L0（提供四档，详见四挡严格度），法律法规文件在“your path”（对着文件夹ctrl+shift+c，复制过来），待审查预案在“your path””，url：xxx key：xxx 所用模型：xxx 温度：（默认0.3）  并发数：（默认5）
+```
+（2）方法二
+```
+laws/    放入法规、标准、规范性文件（PDF / DOCX / TXT / MD）
+plan/    放入待审预案
+```
+/skill emergency-plan-compliance-review，运行整套工作流
+
+本仓库**不含**法规文件和预案样例——法规会修订，仓库内的副本会过期变成错误依据；预案含真实联系人信息。请自行从官方来源获取现行有效版本：全国人大网、中国政府网、应急管理部及各主管部委、地方人民政府官网、国家标准全文公开系统。
+
+一份危化品类预案的典型法规基线约需覆盖：安全生产、消防、生产安全事故应急（条例 + 预案管理办法 + 事故报告调查处理）、危险化学品安全管理、应急预案编制导则、应急装备配备标准、突发事件应对（省级条例）、预警信息发布、地方预案管理办法。
+
+### 2. 驱动执行
+
+```text
+请读取 SKILL.md 与 prompts/master.md，严格按总控流程执行。先只执行 Agent0，完成后落盘输出文件，然后停下来汇报。
+```
+
+Codex CLI：
+
+```bash
+codex --cd emergency-plan-compliance-review --sandbox workspace-write --ask-for-approval on-request
+```
+
+默认挡位 L2，默认不需要 API key（5B 走本环境子智能体分批）。要指定挡位就直接说"用 L3"。
+
+### 3. 逐阶段推进
+
+**首次运行不建议全流程连跑**，在三处停下人工确认：
+
+- **Agent0 后**：看预案类型判定对不对——判错会污染下游全部阶段
+- **Agent3 后**：跑 5 条测试检索看召回质量——5A 和 5B 共用同一知识库，这是双轨设计唯一的共因失效点
+- **Agent4 后**：看条款拆分覆盖度与 `element_tag` 标注
+
+---
+
+## 打包上传
+
+```bash
+python scripts/package_skill.py
+```
+
+生成 `dist/emergency-plan-compliance-review.zip`，其**根目录直接包含 SKILL.md**，可被支持 skill 包的平台直接识别。脚本会在打包后重新读取 zip 校验入口位置——"上传后提示未找到 SKILL.md"的唯一常见原因就是入口被套进了嵌套目录。
+
+仅校验结构不打包：
+
+```bash
+python scripts/package_skill.py --check
+```
+
+默认不打包 `laws/`、`plan/`、`output/` 中的资料，需要连示例一起打包时加 `--with-samples`。
+
+---
+
+## 目录结构
+
+```
+emergency-plan-compliance-review/
+├── SKILL.md            # 入口（frontmatter: name/description）
+├── AGENTS.md           # Codex / 通用 agent 入口
+├── CLAUDE.md           # Claude Code 入口
+├── references/
+│   ├── plan_type_matrix.md    # 预案类型→法规基线映射（检索线索，非可引用依据）
+│   ├── issue_types.md         # 问题类型枚举 + 字段级铁律
+│   └── strictness_levels.md   # 四挡严格度定义
+├── prompts/
+│   ├── master.md              # 总控：派发编排、执行顺序、总体验收
+│   ├── 00~08/prompt.md        # 14 个增强阶段的完整规格
+│   └── L0_original/           # L0 挡位用的原始 5A / 5C / 5D / Agent8（逐字节保留）
+├── scripts/package_skill.py   # 打包与结构校验
+├── laws/               # 用户提供的法规/标准文件（不入库）
+├── plan/               # 待审预案（不入库）
+└── output/             # 全部产出（不入库）
+```
+
+设计上**入口薄、规格厚**：agent 先读 SKILL.md 建立边界，再读 master.md 拿流程，每个阶段的子智能体只读自己那份 prompt。
+
+`references/plan_type_matrix.md` 中的法规名称、文号、年份**只是"应该去找什么"的检索线索，不是可直接引用的依据**——必须在 `laws/` 有对应文件才能落实为审查依据。
+
+---
+
+## 主要产出
+
+| 文件 | 说明 |
+|------|------|
+| `review_config.json` | 本次所用挡位与四个开关取值 |
+| `plan_profile.json` | 预案画像与适用法规基线 |
+| `kb_summary.json` | 知识库摘要（另附 `chroma_db/`、`build_kb.py`、`query_kb.py`） |
+| `clauses.json` | 条款拆分（含 `element_tag` / `uncovered_elements`） |
+| `review_results_5A.json` / `_5B.json` | 双轨原始结果（完整保留，不被覆盖） |
+| `kb_gap_report.json` | 依据缺口：规则命中但知识库无条文 |
+| `rejected_problems.json` | 依据不合法被移出的候选问题 |
+| `fulltext_crosscheck.json` | 全文反证裁定 |
+| `refuted_problems.json` | 被判误报移出的问题（保留完整原始记录供反查） |
+| `review_results_final.json` | 终审结果 + `final_audit_report` |
+| `problems_all.json` | 全部问题汇总 |
+| `summary_report.md` | 汇总报告（含收敛漏斗与能力边界声明） |
+| `plan_annotated.docx` | 批注版预案 |
+| `issue_list.docx` | 问题清单表 + 候选问题附录 |
+| `annotation_log.json` | 批注锚定日志（`anchor_fallback` / `derived.*` 统计） |
+| `review_log.json` | 全程审查日志 |
+
+---
+
+## 边界
+
+- **只审法律法规问题**。严禁纳入实操可行性、资源配置是否合理、PPE 是否合理、疏散距离是否科学、地方适配性、事故案例经验、专家经验判断、写作风格、错别字。
+- **知识库只能来自 `laws/`**，不得凭模型记忆生成法规条文。取不到依据就记入 `kb_gap_report.json`，不生成问题。
+- **Agent6 / Agent7 不得新增问题**：Agent6 只补强已有问题的遗漏依据；Agent7 只核验已发现问题（法规是否现行有效、条款号是否准确、条文是否一致），不得扩大范围、改变编号。
+- **核验不到就记 `unverified`**，禁止编造条文或结论。
+- 每一条款独立检查，每个问题可追溯到具体条款 + 具体法规条文；禁止抽样或代表性检查。
+
+---
+
+## 已知限制
+
+- **端到端从未实跑验证。** 已验证的只有目录结构、打包脚本、zip 根入口、L0 四份原始 prompt 的字节一致性，以及用实跑数据对 5C2 判定逻辑和新旧门禁做的**离线回放**。5C2 的 `derived.*` 补齐链路、L0 下的批注生成、子智能体派发编排都是纸面设计。
+- **整条流水线串行强依赖**：Agent0 判错类型污染下游全部阶段；Agent3 召回质量差会同时拖垮 5A 和 5B（两轨共用同一知识库，双轨设计唯一的共因失效点）。
+- **新引入的数量等式尚未实跑校验**：`raw_issues_in − a_level_rejected − b_level_rejected_after_retry − merged_pairs == final_issues`。
+- **L0 是危化品专用的**：原始 5A 的 10 条规则全部围绕危化品，审其他类型预案会大面积漏检。
+- `output/model_config.json` 会包含 API key，已在 `.gitignore` 中忽略，请勿提交。
+- Agent7 联网核验会向法规官网发起请求；无网络时相应问题标为 `unverified` 并据此降低置信度。
+
+
 ## 架构
 
 ### 执行模型：主流程只编排，每阶段派一个子智能体
@@ -188,126 +324,3 @@ Agent8   成果汇总                 4 份交付物 + 能力边界声明
 
 ---
 
-## 快速开始
-
-### 1. 准备资料
-
-```
-laws/    放入法规、标准、规范性文件（PDF / DOCX / TXT / MD）
-plan/    放入待审预案
-```
-
-本仓库**不含**法规文件和预案样例——法规会修订，仓库内的副本会过期变成错误依据；预案含真实联系人信息。请自行从官方来源获取现行有效版本：全国人大网、中国政府网、应急管理部及各主管部委、地方人民政府官网、国家标准全文公开系统。
-
-一份危化品类预案的典型法规基线约需覆盖：安全生产、消防、生产安全事故应急（条例 + 预案管理办法 + 事故报告调查处理）、危险化学品安全管理、应急预案编制导则、应急装备配备标准、突发事件应对（省级条例）、预警信息发布、地方预案管理办法。
-
-### 2. 驱动执行
-
-```text
-请读取 SKILL.md 与 prompts/master.md，严格按总控流程执行。先只执行 Agent0，完成后落盘输出文件，然后停下来汇报。
-```
-
-Codex CLI：
-
-```bash
-codex --cd emergency-plan-compliance-review --sandbox workspace-write --ask-for-approval on-request
-```
-
-默认挡位 L2，默认不需要 API key（5B 走本环境子智能体分批）。要指定挡位就直接说"用 L3"。
-
-### 3. 逐阶段推进
-
-**首次运行不建议全流程连跑**，在三处停下人工确认：
-
-- **Agent0 后**：看预案类型判定对不对——判错会污染下游全部阶段
-- **Agent3 后**：跑 5 条测试检索看召回质量——5A 和 5B 共用同一知识库，这是双轨设计唯一的共因失效点
-- **Agent4 后**：看条款拆分覆盖度与 `element_tag` 标注
-
----
-
-## 打包上传
-
-```bash
-python scripts/package_skill.py
-```
-
-生成 `dist/emergency-plan-compliance-review.zip`，其**根目录直接包含 SKILL.md**，可被支持 skill 包的平台直接识别。脚本会在打包后重新读取 zip 校验入口位置——"上传后提示未找到 SKILL.md"的唯一常见原因就是入口被套进了嵌套目录。
-
-仅校验结构不打包：
-
-```bash
-python scripts/package_skill.py --check
-```
-
-默认不打包 `laws/`、`plan/`、`output/` 中的资料，需要连示例一起打包时加 `--with-samples`。
-
----
-
-## 目录结构
-
-```
-emergency-plan-compliance-review/
-├── SKILL.md            # 入口（frontmatter: name/description）
-├── AGENTS.md           # Codex / 通用 agent 入口
-├── CLAUDE.md           # Claude Code 入口
-├── references/
-│   ├── plan_type_matrix.md    # 预案类型→法规基线映射（检索线索，非可引用依据）
-│   ├── issue_types.md         # 问题类型枚举 + 字段级铁律
-│   └── strictness_levels.md   # 四挡严格度定义
-├── prompts/
-│   ├── master.md              # 总控：派发编排、执行顺序、总体验收
-│   ├── 00~08/prompt.md        # 14 个增强阶段的完整规格
-│   └── L0_original/           # L0 挡位用的原始 5A / 5C / 5D / Agent8（逐字节保留）
-├── scripts/package_skill.py   # 打包与结构校验
-├── laws/               # 用户提供的法规/标准文件（不入库）
-├── plan/               # 待审预案（不入库）
-└── output/             # 全部产出（不入库）
-```
-
-设计上**入口薄、规格厚**：agent 先读 SKILL.md 建立边界，再读 master.md 拿流程，每个阶段的子智能体只读自己那份 prompt。
-
-`references/plan_type_matrix.md` 中的法规名称、文号、年份**只是"应该去找什么"的检索线索，不是可直接引用的依据**——必须在 `laws/` 有对应文件才能落实为审查依据。
-
----
-
-## 主要产出
-
-| 文件 | 说明 |
-|------|------|
-| `review_config.json` | 本次所用挡位与四个开关取值 |
-| `plan_profile.json` | 预案画像与适用法规基线 |
-| `kb_summary.json` | 知识库摘要（另附 `chroma_db/`、`build_kb.py`、`query_kb.py`） |
-| `clauses.json` | 条款拆分（含 `element_tag` / `uncovered_elements`） |
-| `review_results_5A.json` / `_5B.json` | 双轨原始结果（完整保留，不被覆盖） |
-| `kb_gap_report.json` | 依据缺口：规则命中但知识库无条文 |
-| `rejected_problems.json` | 依据不合法被移出的候选问题 |
-| `fulltext_crosscheck.json` | 全文反证裁定 |
-| `refuted_problems.json` | 被判误报移出的问题（保留完整原始记录供反查） |
-| `review_results_final.json` | 终审结果 + `final_audit_report` |
-| `problems_all.json` | 全部问题汇总 |
-| `summary_report.md` | 汇总报告（含收敛漏斗与能力边界声明） |
-| `plan_annotated.docx` | 批注版预案 |
-| `issue_list.docx` | 问题清单表 + 候选问题附录 |
-| `annotation_log.json` | 批注锚定日志（`anchor_fallback` / `derived.*` 统计） |
-| `review_log.json` | 全程审查日志 |
-
----
-
-## 边界
-
-- **只审法律法规问题**。严禁纳入实操可行性、资源配置是否合理、PPE 是否合理、疏散距离是否科学、地方适配性、事故案例经验、专家经验判断、写作风格、错别字。
-- **知识库只能来自 `laws/`**，不得凭模型记忆生成法规条文。取不到依据就记入 `kb_gap_report.json`，不生成问题。
-- **Agent6 / Agent7 不得新增问题**：Agent6 只补强已有问题的遗漏依据；Agent7 只核验已发现问题（法规是否现行有效、条款号是否准确、条文是否一致），不得扩大范围、改变编号。
-- **核验不到就记 `unverified`**，禁止编造条文或结论。
-- 每一条款独立检查，每个问题可追溯到具体条款 + 具体法规条文；禁止抽样或代表性检查。
-
----
-
-## 已知限制
-
-- **端到端从未实跑验证。** 已验证的只有目录结构、打包脚本、zip 根入口、L0 四份原始 prompt 的字节一致性，以及用实跑数据对 5C2 判定逻辑和新旧门禁做的**离线回放**。5C2 的 `derived.*` 补齐链路、L0 下的批注生成、子智能体派发编排都是纸面设计。
-- **整条流水线串行强依赖**：Agent0 判错类型污染下游全部阶段；Agent3 召回质量差会同时拖垮 5A 和 5B（两轨共用同一知识库，双轨设计唯一的共因失效点）。
-- **新引入的数量等式尚未实跑校验**：`raw_issues_in − a_level_rejected − b_level_rejected_after_retry − merged_pairs == final_issues`。
-- **L0 是危化品专用的**：原始 5A 的 10 条规则全部围绕危化品，审其他类型预案会大面积漏检。
-- `output/model_config.json` 会包含 API key，已在 `.gitignore` 中忽略，请勿提交。
-- Agent7 联网核验会向法规官网发起请求；无网络时相应问题标为 `unverified` 并据此降低置信度。
