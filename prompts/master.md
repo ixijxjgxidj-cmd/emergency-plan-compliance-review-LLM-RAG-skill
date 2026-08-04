@@ -35,7 +35,7 @@
 ```
 Agent0  (预案画像与类型判定)
   ↓
-挡位选择 ← 默认 L2；选 L0 则整链切至 prompts/L0_original/
+挡位选择 ← 默认 L2；选 L0 则 5C/5D 换用 L0_original 的原始 prompt
   ↓
 Agent1  (本地法规盘点)
   ↓
@@ -93,13 +93,26 @@ Agent8  (成果汇总)
 
 问题数的收敛来自四个独立机制（跨条款聚合、A 级依据门禁、B 级字段完备性、5C2 全文反证）。挡位就是这四个开关的组合，定义见 `references/strictness_levels.md`。
 
-### L0 是独立执行链，必须先分流
+### L0 只替换 5C 与 5D
 
-**选 L0 时立即停止执行本文件，改读 `prompts/L0_original/master.md` 并按其流程跑到底。** 那是原始系统的 12 个阶段 prompt，逐字节原样保留：无 Agent0、无 5C2、无依据门禁、无跨条款聚合、无 `quoted_text` 要求，输出 17 个文件（含 `chapter2A_issue_list.docx`）。
+L0 **不是**整链切换。Agent0～5B 与 5E～8 一律仍用本目录下的增强版，只有两处不同：
 
-`review_config.json` 此时只写 `{"strictness_level": "L0", "chain": "L0_original"}`，四个开关不写——它们只对增强链有意义。
+1. 执行 5C 时读 `prompts/L0_original/05C_cross_audit/prompt.md`（原始版：只做决策矩阵裁定 + 同条款内去重 + 置信度标注 + 编号核查，**无依据门禁、无跨条款归并、无字段完备性检查**）。
+2. 执行 5D 时读 `prompts/L0_original/05D_recheck/prompt.md`（原始版：只做 `citation_check`，**无 `field_check`**），并**跳过 5C2**。
 
-选 L0 前必须一句话告知用户三件事：① 原始链是**危化品专用**的（无预案画像，规则库硬编码危化品法规名），审其他类型预案不要用；② 原始 5A 规则自带的四部法规不在 `laws/` 里，实跑 52 个问题中 34 个依据取自库外；③ 批注为原始质量（挂整段、无条款号、无修订建议）。L0 用于复现与对照，不建议直接当交付件。
+`review_config.json` 记：
+
+```json
+{ "strictness_level": "L0",
+  "agent5c_prompt": "prompts/L0_original/05C_cross_audit/prompt.md",
+  "agent5d_prompt": "prompts/L0_original/05D_recheck/prompt.md",
+  "fulltext_crosscheck": "off" }
+```
+
+选 L0 前必须告知用户两件事：
+
+- **L0 不会复现原始的 52 条。** 增强版 5A 自身的"依据落实门禁"会把取不到库内条文的命中记为 `advisory` 而不生成 issue，那 34 条库外依据的问题在 5A 阶段就没产生。要真正复现 52 条需连 5A 的门禁一起关，属于改 5A，不在挡位范围内。
+- **L0 的问题可能缺 `article` / `quoted_text` / `suggestion`**，因为原始 5C/5D 不查这三项。Agent8 生成批注时会大量走 `anchor_fallback: paragraph`（锚整段而非锚出错那句），"依据"行可能只有法规名无条款号。
 
 L1/L2/L3 继续读本文件，按下面的开关执行。
 

@@ -33,7 +33,6 @@ REQUIRED_FILES = [
     "references/plan_type_matrix.md",
     "references/issue_types.md",
     "references/strictness_levels.md",
-    "prompts/L0_original/master.md",
 ]
 
 REQUIRED_PROMPTS = [
@@ -53,20 +52,10 @@ REQUIRED_PROMPTS = [
     "08_result_summary",
 ]
 
-# L0 原始链（逐字节保留的原始系统 prompt，选 L0 挡位时整链切过去）
+# L0 挡位替换用的原始 prompt（逐字节保留；L0 只换 5C 与 5D 两个阶段）
 REQUIRED_L0_PROMPTS = [
-    "01_law_inventory",
-    "02_law_classification",
-    "03_kb_build",
-    "04_clause_split",
-    "05A_rule_screening",
-    "05B_llm_deep_review",
     "05C_cross_audit",
     "05D_recheck",
-    "05E_final_audit",
-    "06_missing_basis_review",
-    "07_web_verification",
-    "08_result_summary",
 ]
 
 # 必须保留的空目录占位
