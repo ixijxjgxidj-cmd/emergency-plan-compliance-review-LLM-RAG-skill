@@ -131,14 +131,6 @@ emergency-plan-compliance-review/
 
 ---
 
-## 已知限制
-
-- **端到端从未实跑验证。** 已验证的只有目录结构、打包脚本、zip 根入口、L0 四份原始 prompt 的字节一致性，以及用实跑数据对 5C2 判定逻辑和新旧门禁做的**离线回放**。5C2 的 `derived.*` 补齐链路、L0 下的批注生成、子智能体派发编排都是纸面设计。
-- **整条流水线串行强依赖**：Agent0 判错类型污染下游全部阶段；Agent3 召回质量差会同时拖垮 5A 和 5B（两轨共用同一知识库，双轨设计唯一的共因失效点）。
-- **新引入的数量等式尚未实跑校验**：`raw_issues_in − a_level_rejected − b_level_rejected_after_retry − merged_pairs == final_issues`。
-- `output/model_config.json` 会包含 API key，已在 `.gitignore` 中忽略，请勿提交。
-- Agent7 联网核验会向法规官网发起请求；无网络时相应问题标为 `unverified` 并据此降低置信度。
-
 
 ## 架构
 
