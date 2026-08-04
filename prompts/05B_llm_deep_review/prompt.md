@@ -6,14 +6,14 @@
 
 ## 前置条件
 
-- 已完成"模型配置"，`./output/model_config.json` 存在。
-- 必须按其中的模型、并发方式、batch 大小、temperature 执行。
+- 默认（模式 A）**不需要** `./output/model_config.json`，不需要外部 API key，直接用本环境的子智能体能力。
+- 仅当用户为 5B 指定了另外的模型或另给了 key（模式 B）时，才必须先完成"模型配置"并读取 `./output/model_config.json`，按其中的模型、并发方式、batch 大小、temperature 执行。
 
 ## 输入
 
 - `./output/clauses.json`
 - `./output/plan_profile.json`
-- `./output/model_config.json`
+- `./output/model_config.json`（**仅模式 B 需要**）
 - `./chroma_db/`、`query_kb.py`
 
 ## 输出
@@ -21,11 +21,20 @@
 - `./output/review_results_5B.json`
 - `./output/5b_batches/batch_NN.json`、`./output/5b_results/result_NN.json`（分批执行时的中间产物，必须保留）
 
-## 执行模式（二选一，必须在开始前确定并记入 review_log）
+## 执行模式（开始前必须确定并记入 `review_log.json` 的 `agent5b_mode`）
 
-### 模式 A：子智能体分批（**推荐，条款数 > 40 时强制**）
+模式由**用户是否自带模型**决定，与条款数无关：
 
-单一上下文逐条审 137 条会耗尽上下文，导致后半程质量塌陷或直接偷懒。改为分批派发：
+| 情形 | 模式 |
+|------|------|
+| 用户未声明模型（默认） | **模式 A：本环境子智能体分批** |
+| 用户明确为 5B 指定另外的模型，或提供了 `api_key` / `base_url` / `model_name` | **模式 B：外部模型 API 逐条调用** |
+
+判断依据：用户是否给出了 5B 专用的模型/密钥。**不要主动索要 API key**——默认按模式 A 执行即可；用户没提模型这件事就是选择了模式 A。
+
+### 模式 A（默认）：本环境子智能体分批
+
+单一上下文逐条审上百条会耗尽上下文，导致后半程质量塌陷或直接偷懒。改为分批派发：
 
 1. 按 `batch_size`（默认 10）把 `clauses.json` 切分为 N 批，落盘 `./output/5b_batches/batch_01.json` … `batch_NN.json`。每个 batch 文件自带该批条款原文 + 各条的 Top20 检索结果，**使子智能体无需继承主上下文即可独立工作**。
 2. 逐批派发独立子智能体，每个子智能体只看自己那一批，审完落盘 `./output/5b_results/result_NN.json` 后即结束，释放上下文。
@@ -36,9 +45,17 @@
 
 **批次完整性校验（必做）**：合并前逐批比对 `batch_NN.json` 的 `clause_id` 集合与 `result_NN.json` 的 `clause_id` 集合，任何缺失必须补审，不得静默合并。
 
-### 模式 B：单上下文串行/并发
+子智能体派发时必须把本文件的"LLM System Prompt""检查矩阵""每条 CLAUSE 记录"三节完整传入，不得只传条款让其自由发挥。
 
-仅在条款数 ≤ 40 时使用。按 `model_config.json` 的并发设置直接逐条调用。
+### 模式 B：用户自带模型 / 另给 key
+
+见下方"模式 B 完整规格"一节。该节是原始 5B 规格的完整还原，用户自带模型时**按该节执行**，不套用模式 A 的分批流程。
+
+---
+
+# 模式 A 规格（默认路径）
+
+以下各节（"审查步骤"至"编号"）是**模式 A** 的执行规格。用户自带模型时请直接跳到文档末尾的"模式 B 完整规格"。
 
 ## 审查步骤
 
@@ -176,10 +193,148 @@
 
 `P2-001` 起全局连续，与 Agent5A 的 `P-` 体系**独立**，由 Agent5C 统一重排。
 
-## 验收
+---
+
+# 模式 B 完整规格（用户自带模型 / 另给 key 时按此执行）
+
+本节完整还原原始 5B 规格。触发后**必须调用 LLM API**，逐条发送条款 + 知识库检索结果，由模型进行语义级法律分析，不套用模式 A 的子智能体分批流程。
+
+### 前置条件
+
+- 必须先完成"模型配置"步骤，读取 `./output/model_config.json`。
+- 必须按配置中的模型、并发方式、batch 大小执行。
+
+### 输入
+
+- `./output/clauses.json`
+- `./output/model_config.json`
+- `./chroma_db/`
+- `query_kb.py`
+
+### 输出
+
+- `./output/review_results_5B.json`
+
+### 审查步骤
+
+对每条 CLAUSE 执行：
+
+1. **检索**：用条款内容作为 query，检索知识库 Top-K（默认 **Top15**）
+2. **构建 prompt**：将条款原文 + 检索到的法规片段作为上下文
+3. **调用 LLM**：发送 system prompt（审查规则）+ user prompt（条款+法规上下文）
+4. **解析结果**：提取 LLM 返回的 JSON 格式审查结论
+5. **记录**：保存 retrieval_log + LLM reasoning
+
+### LLM System Prompt（必须包含）
+
+```
+你是中国法律法规合规审查专家。对应急预案条款做合规审查。
+
+审查范围（仅限法律法规问题）：
+1. 与上位法不一致
+2. 低于法定要求
+3. 缺失法定必备内容
+4. 职责/权限/主体不明确
+5. 法定程序缺失
+6. 法定时限缺失/不合理
+7. 法定衔接不清
+8. 强制性条文不符合
+9. 引用法规错误
+
+禁止纳入：实操可行性、资源配置、PPE、疏散距离、地方适配性、事故案例、专家判断。
+
+输出JSON格式审查结果。
+```
+
+### 允许判定问题类型
+
+- 与上位法或规范不一致
+- 低于法定要求
+- 缺失法定必备内容
+- 职责/权限/主体不明确
+- 法定程序缺失
+- 法定时限缺失/不合理
+- 法定衔接不清
+- 强制性条文表述不符合要求
+- 必要附件/要素缺失
+- 引用法规或条款错误
+
+### Temperature 设置
+
+- 从 `model_config.json` 读取 temperature 值
+- 如果该值为空或缺失，默认使用 **0.3**
+- 合规审查需要稳定、确定性强的输出，推荐 0.1~0.5
+
+### 并发与批处理
+
+根据 `model_config.json` 中的配置：
+
+- **串行模式**：逐条调用 API，每条间隔 0.5 秒
+- **并发模式**：按 batch_size 批量发送，每批间隔 1 秒
+- **API 失败处理**：重试 3 次，间隔递增（3s/6s/9s）
+- **进度记录**：每处理 10 条输出进度，每 20 条写入 review_log
+
+### 每条 CLAUSE 记录至少包括
+
+- `clause_id`
+- `status`：pass / fail / error
+- `issue_count`
+- `issues`（每个问题**必须**包含以下字段）：
+  - `type`：问题类型
+  - `description`：具体问题描述
+  - `reference`：法规全称（如"危险化学品安全管理条例"）
+  - `article`：具体条款号（如"第二十三条"）
+  - `clause_text`：该条款的原文摘录（至少 30 字）
+  - `severity`：high / medium / low
+- `evidence`（Top-K 检索前 3 条）
+- `retrieval_log`（query + top_hits）
+- `reasoning`（LLM 的分析过程）
+
+### 问题编号
+
+- 全局连续：`P2-001`、`P2-002`、`P2-003`……
+- 与 Agent5A 的编号体系**独立**，前缀用 `P2-` 区分
+
+### 法规引用强制要求
+
+每个 fail 类型的 issue **必须**包含精确的法规引用：
+
+| 字段 | 要求 | 示例 |
+|------|------|------|
+| `reference` | 法规全称，不得缩写 | "危险化学品安全管理条例" |
+| `article` | 具体条款号 | "第二十三条" |
+| `clause_text` | 该条款原文摘录（≥30字） | "生产、储存危险化学品的单位……" |
+
+- 禁止只写法规名不写条款号
+- 禁止只写条款号不写条文原文
+- 如果 LLM 无法确定具体条款号，应在 reasoning 中说明，severity 降为 low
+
+### 验收
+
+- `CLAUSE` 数量必须等于 `review_results_5B.json` 条目数量
+- 无漏条（error 状态也算已处理）
+- 每条都有 retrieval_log 和 reasoning
+- 必须更新 `./output/review_log.json`
+
+### 下游兼容补充（**必须执行，否则模式 B 的结果会被 5C 全部拒收**）
+
+原始规格成型于 5C 依据门禁之前，其 issue 字段集缺两项现在下游强制要求的字段。模式 B 在保持上述规格不变的前提下，**额外**要求每个 issue 补齐：
+
+- `quoted_text`：从条款正文逐字摘出的出错文字（≥10 字），必须能在条款原文中精确匹配。Agent8 靠它锚定批注位置。
+- `suggestion`：依法应当如何表述或补充，指向具体的法定表述/法定要素。
+
+理由：5C 的依据门禁对每个候选问题查五项（`reference` 在库、法规可用、`article` 具体、`quoted_text` 可匹配、`suggestion` 非空），任一不过即移出问题清单。若模式 B 只按原始字段集输出，全部问题会在 5C 被拒收，`review_results.json` 将为空。这两项是交付所必需，不是可选增强。
+
+除此之外，模式 B 不引入模式 A 的 `checks` 检查矩阵、`pass_justification`、`suspected_issues`、`checked_dimensions` 等字段要求；但"pass 率自检"仍适用（见验收节），因为它是对模型系统性宽松的兜底，与执行模式无关。
+
+---
+
+# 验收（两种模式通用）
 
 - `review_results_5B.json` 条目数 == `clauses.json` 条目数（error 也算已处理）。
-- 每条都有 `retrieval_log`、`reasoning`、`checked_dimensions`；判 pass 的另有 `pass_justification`。
+- `review_log.json` 中已记录 `agent5b_mode`（`A` 或 `B`）；模式 B 还须记录所用 `model_name` 与 `base_url`（**不得记录 api_key**）。
+- 每条都有 `retrieval_log`、`reasoning`；模式 A 的另有 `checked_dimensions`，判 pass 的另有 `pass_justification`。
 - 模式 A 下：`5b_batches/` 与 `5b_results/` 批次一一对应，每批 `clause_id` 集合完全一致，无缺审。
-- **pass 率自检**：若 pass 率 > 90%，必须在 `review_log.json` 写入 `pass_rate_alert`，并对 5A 判 fail 而 5B 判 pass 的条款重审一遍（这批条款是 5B 漏检的高发区），重审结论写入 `recheck_after_alert`。实跑中 5B pass 率 96.4%（132/137），而 5A 在同一批条款上发现 34 条 fail，其中 32 条为 5A 独有——说明 5B 在"必备要素缺失"这类问题上系统性漏检，必须自检。
+- 两种模式下每个 issue 都有 `quoted_text` 与 `suggestion`（模式 B 见"下游兼容补充"）。
+- **pass 率自检**：若 pass 率 > 90%，必须在 `review_log.json` 写入 `pass_rate_alert`，并对 5A 判 fail 而 5B 判 pass 的条款重审一遍（这批条款是 5B 漏检的高发区），重审结论写入 `recheck_after_alert`。实跑中 5B pass 率 96.4%（132/137），而 5A 在同一批条款上发现 34 条 fail，其中 32 条为 5A 独有——说明 5B 在"必备要素缺失"这类问题上系统性漏检，必须自检。两种模式都适用。
 - 更新 `./output/review_log.json`。

@@ -43,7 +43,7 @@ Agent3  (知识库构建)
   ↓
 Agent4  (预案条款拆分)
   ↓
-模型配置 ← 询问用户：模型 / 并发 / batch / temperature
+模型配置 ← 仅当用户自带模型/key 时；默认跳过
   ↓
 Agent5A (规则快筛，不调用 LLM)
   ↓
@@ -86,14 +86,20 @@ Agent8  (成果汇总)
 
 ## 模型配置说明
 
-执行 Agent5B 前必须询问用户：
+**默认不需要模型配置，也不要向用户索要 API key。** Agent5B 默认走模式 A（本环境子智能体分批），直接执行即可。
 
-1. 模型：内置配置（`prompts/model_config_template.json`）/ 自定义（`api_key`、`base_url`、`model_name`）
+仅当用户**主动声明**为 5B 指定另外的模型，或主动提供了 `api_key` / `base_url` / `model_name` 时，才进入模式 B，此时需确认：
+
+1. 模型：`api_key`、`base_url`、`model_name`（参考 `prompts/model_config_template.json`）
 2. 并发方式：串行 / 并发
 3. batch 大小（仅并发）：3 / 5 / 10
 4. temperature：用户未回答则默认 **0.3**（推荐 0.1~0.5）
 
-写入 `./output/model_config.json`。
+写入 `./output/model_config.json`（含 key，已在 `.gitignore` 中忽略，不得提交）。
+
+模式 B 的完整执行规格见 `prompts/05B_llm_deep_review/prompt.md` 的"模式 B 完整规格"一节——该节是原始 5B 规格的完整还原，用户自带模型时按该节执行，不套用模式 A 的分批流程。
+
+无论走哪个模式，都必须把实际使用的模式记入 `review_log.json` 的 `agent5b_mode`。
 
 ## 总体验收
 

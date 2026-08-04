@@ -81,7 +81,7 @@ Agent3  知识库构建
    ↓
 Agent4  预案条款拆分（按预案类型选结构模板）
    ↓
-模型配置（询问用户：模型 / 并发 / batch / temperature）
+模型配置（仅当用户自带模型时；默认跳过）
    ↓
 Agent5A 规则快筛（通用规则 + 类型专属规则，不调用 LLM）
    ↓
@@ -147,9 +147,11 @@ Agent8  成果汇总
 
 按 `plan_profile.json` 选用结构模板，把 `./plan/*` 拆为 `CLAUSE-001` 起连续编号的最小可审查单元。输出 `./output/clauses.json`。
 
-### 模型配置（Agent5B 前置）
+### 模型配置（仅模式 B 需要）
 
-必须询问用户：模型（内置 / 自定义 api_key+base_url+model_name）、并发方式（串行 / 并发）、batch 大小（3/5/10，仅并发）、temperature（未回答默认 **0.3**）。写入 `./output/model_config.json`。
+**默认不需要，也不要向用户索要 API key。** Agent5B 默认走模式 A（本环境子智能体分批），无需外部模型。
+
+仅当用户主动为 5B 指定另外的模型或主动提供 key 时，才确认：`api_key`+`base_url`+`model_name`、并发方式（串行 / 并发）、batch 大小（3/5/10，仅并发）、temperature（未回答默认 **0.3**），写入 `./output/model_config.json`。
 
 ### Agent5A 规则快筛
 
