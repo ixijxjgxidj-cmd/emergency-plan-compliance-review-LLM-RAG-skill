@@ -55,7 +55,11 @@
 | 第 14 项（聚合） | 同一检查点不得多编号 | 同上 | 不查（L0 本就每条款独立编号） |
 | 第 17 项（全文反证） | `refuted` 必须已移出 | `refuted` 必须带 `refuted_by` 标记且留在清单 | 不查（`fulltext_crosscheck.json` 缺失为合法） |
 
-**任何挡位下都必须核查的**：`quoted_text` 可定位性（第 18 项）、数量等式自洽、`upstream_basis_violation_alert` 已传递、漏斗数据已写入 `final_audit_report`。挡位放宽的是"是否移出"，不是"是否核查"。
+| 第 18 项（错误原文） | `quoted_text` 必须非空且可精确匹配 | 同 `filter` | **L0 例外**：原始 5A 不产出 `quoted_text`，本阶段只核查"是否已交由 Agent8 按 `derived.quoted_text` 规则补齐"，不因其为空而判不合格 |
+
+**任何挡位下都必须核查的**：数量等式自洽、`upstream_basis_violation_alert` 已传递（若有）、漏斗数据已写入 `final_audit_report`、每个问题可追溯到具体 `clause_id`。挡位放宽的是"是否移出"，不是"是否核查"。
+
+**L0 专项核查**：`reproduce_original: true` 时，须核对最终问题数是否与 5A+5B 原始命中数一致（不得有静默丢弃），并在 `final_audit_report` 中列出 `basis_not_in_kb` 条数——这是 L0 结果可信度的关键披露项，缺失即判审计不通过。
 
 ## 禁止
 

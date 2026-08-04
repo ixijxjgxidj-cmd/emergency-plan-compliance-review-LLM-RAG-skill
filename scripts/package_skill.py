@@ -52,10 +52,12 @@ REQUIRED_PROMPTS = [
     "08_result_summary",
 ]
 
-# L0 挡位替换用的原始 prompt（逐字节保留；L0 只换 5C 与 5D 两个阶段）
+# L0 挡位替换用的原始 prompt（逐字节保留；L0 换 5A / 5C / 5D / Agent8 四个阶段）
 REQUIRED_L0_PROMPTS = [
+    "05A_rule_screening",
     "05C_cross_audit",
     "05D_recheck",
+    "08_result_summary",
 ]
 
 # 必须保留的空目录占位

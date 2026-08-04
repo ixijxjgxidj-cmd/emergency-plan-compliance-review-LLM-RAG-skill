@@ -15,7 +15,7 @@ emergency-plan-compliance-review/   ← 上传/打包这一层（zip 根目录�
 ├── AGENTS.md         ← Codex / 通用 agent 入口，内容指向本文件
 ├── CLAUDE.md         ← Claude Code 入口，内容指向本文件
 ├── references/       ← 预案类型-法规基线矩阵、问题类型清单
-├── prompts/          ← 各阶段 Agent prompt（含 L0_original/ 的原始 5C、5D）
+├── prompts/          ← 各阶段 Agent prompt（含 L0_original/ 的原始 5A、5C、5D、8）
 ├── scripts/          ← 打包与校验脚本
 ├── laws/             ← 用户提供的法规/标准/规范文件
 ├── plan/             ← 待审预案
@@ -156,16 +156,20 @@ Agent8  成果汇总
 
 | 挡位 | 聚合 | A 级 | B 级 | 全文反证 | 实跑数据上的输出 |
 |------|------|------|------|----------|------------------|
-| L0 原始 | — | — | — | off | 17 条（**5C/5D 换用原始 prompt**，不删任何一条） |
+| L0 原始 | off | off | off | off | **52 条**（5A/5C/5D/8 换用原始 prompt，完全复现） |
 | L1 去重 | filter | off | off | off | 17 条主张 |
 | **L2 标注**（默认） | filter | annotate | annotate | annotate | 17 条，11 条带警示标记 |
 | L3 严格 | filter | filter | filter | filter | 6 条 |
 
 L3 = L2 中无任何标记的那部分，两者是严格包含关系。写入 `./output/review_config.json`，各阶段据此执行。
 
-**L0 只替换 5C 与 5D 两个阶段**：Agent0～5B 与 5E～8 仍用增强版，5C/5D 换读 `prompts/L0_original/` 下的原始 prompt（逐字节保留），并跳过 5C2。原始 5C/5D 保留决策矩阵与同条款去重，但**无依据门禁、无跨条款归并、无字段完备性检查**——一条问题都不删。
+**L0 替换 5A / 5C / 5D / Agent8 四个阶段**，读 `prompts/L0_original/` 下逐字节保留的原始 prompt，并跳过 5C2。目标是**完全复现 52 条**。
 
-两点代价：L0 不会复现原始的 52 条（增强版 5A 自身的依据落实门禁已把库外依据的命中记为 `advisory`）；问题可能缺 `article`/`quoted_text`/`suggestion`，Agent8 批注会大量走 `anchor_fallback: paragraph`。
+连 5A 一起换是必要条件：52 条里 34 条的依据是《危险化学品安全管理条例》《GB/T 29639》《GB 30077》《突发环境事件应急管理办法》，四部都不在 `laws/` 里。它们能出现是因为**原始 5A 规则库自带法规名**且无依据落实门禁；增强版 5A 恰好堵掉这两点，所以 5A 不换回原始版就复现不出 52 条。
+
+**唯一刻意偏离原样的是批注格式**：L0 要复现的是 52 条命中，不是原始那个批注质量（挂整段、无条款号、无修订建议）。所以问题清单与报告结构按原始 prompt，批注一律按四字段 + 判定标签行模板；原始 5A 不产出的 `quoted_text`/`article`/`clause_text`/`suggestion` 由 Agent8 补齐并逐条标 `derived.*`，补不到时如实退化（写"条款号未能在本地知识库中定位"、锚定退化为整段），禁止编造。
+
+三点须知：约 34/52 条依据不在库内；52 条去重后只有约 10 个不同缺陷（最重复的出现 19 次）；**L0 的 10 条规则全部围绕危化品，非危化品预案请用 L1 以上**。
 
 **知识库越不全，越该用 L2。** 实跑那次 `laws/` 只有 9 部可用法规，A 级剔除率 24%，其中"未参照装备配备标准"一条经全文反证判定成立，却因本地缺该标准而被剔。
 

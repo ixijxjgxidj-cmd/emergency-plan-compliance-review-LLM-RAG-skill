@@ -35,7 +35,7 @@
 ```
 Agent0  (预案画像与类型判定)
   ↓
-挡位选择 ← 默认 L2；选 L0 则 5C/5D 换用 L0_original 的原始 prompt
+挡位选择 ← 默认 L2；选 L0 则 5A/5C/5D/8 换用 L0_original 的原始 prompt
   ↓
 Agent1  (本地法规盘点)
   ↓
@@ -143,26 +143,63 @@ Agent8  (成果汇总)
 
 问题数的收敛来自四个独立机制（跨条款聚合、A 级依据门禁、B 级字段完备性、5C2 全文反证）。挡位就是这四个开关的组合，定义见 `references/strictness_levels.md`。
 
-### L0 只替换 5C 与 5D
+### L0：替换 5A、5C、5D、Agent8，目标是完全复现 52 条
 
-L0 **不是**整链切换。Agent0～5B 与 5E～8 一律仍用本目录下的增强版，只有两处不同：
+L0 的定位是**如实复现原始系统的命中结果**，同时把交付件质量拉到可用。四个阶段换用原始 prompt，其余（Agent0～4、5B、5E、6、7）仍用本目录下的增强版：
 
-1. 执行 5C 时读 `prompts/L0_original/05C_cross_audit/prompt.md`（原始版：只做决策矩阵裁定 + 同条款内去重 + 置信度标注 + 编号核查，**无依据门禁、无跨条款归并、无字段完备性检查**）。
-2. 执行 5D 时读 `prompts/L0_original/05D_recheck/prompt.md`（原始版：只做 `citation_check`，**无 `field_check`**），并**跳过 5C2**。
+| 阶段 | L0 读哪份 | 关键差异 |
+|------|-----------|----------|
+| Agent5A | `prompts/L0_original/05A_rule_screening/prompt.md` | 10 条规则，**规则自带法规名**（GB/T 29639、GB 30077、危险化学品安全管理条例、突发环境事件应急管理办法）；**无依据落实门禁**（取不到库内条文也生成 issue）；**无跨条款聚合**；issue 只有 `type`/`description`/`reference`/`severity`/`rule_id` 五个字段 |
+| Agent5C | `prompts/L0_original/05C_cross_audit/prompt.md` | 只做决策矩阵 + 同条款内去重 + 置信度标注 + 编号核查；**无依据门禁、无跨条款归并、无字段完备性检查** |
+| Agent5C2 | **跳过** | `fulltext_crosscheck: off` |
+| Agent5D | `prompts/L0_original/05D_recheck/prompt.md` | 只做 `citation_check`，**无 `field_check`** |
+| Agent8 | `prompts/L0_original/08_result_summary/prompt.md` | 输出 `chapter2A_issue_list.docx`（原始文件名）；**但批注格式必须覆盖，见下** |
 
 `review_config.json` 记：
 
 ```json
 { "strictness_level": "L0",
+  "reproduce_original": true,
+  "agent5a_prompt": "prompts/L0_original/05A_rule_screening/prompt.md",
   "agent5c_prompt": "prompts/L0_original/05C_cross_audit/prompt.md",
   "agent5d_prompt": "prompts/L0_original/05D_recheck/prompt.md",
-  "fulltext_crosscheck": "off" }
+  "agent8_prompt":  "prompts/L0_original/08_result_summary/prompt.md",
+  "cross_clause_aggregation": "off",
+  "basis_gate_a": "off",
+  "basis_gate_b": "off",
+  "fulltext_crosscheck": "off",
+  "annotation_template": "prompts/08_result_summary/prompt.md#批注正文模板" }
 ```
 
-选 L0 前必须告知用户两件事：
+#### L0 的唯一一处刻意偏离原样：批注格式
 
-- **L0 不会复现原始的 52 条。** 增强版 5A 自身的"依据落实门禁"会把取不到库内条文的命中记为 `advisory` 而不生成 issue，那 34 条库外依据的问题在 5A 阶段就没产生。要真正复现 52 条需连 5A 的门禁一起关，属于改 5A，不在挡位范围内。
-- **L0 的问题可能缺 `article` / `quoted_text` / `suggestion`**，因为原始 5C/5D 不查这三项。Agent8 生成批注时会大量走 `anchor_fallback: paragraph`（锚整段而非锚出错那句），"依据"行可能只有法规名无条款号。
+原始 Agent8 对批注只有三句话要求（保留原文、在对应条款位置插入批注、能定位回原条款），实跑出来就是"挂整段、无条款号、无修订建议、正文夹带流程元数据"。**L0 必须复现的是 52 条命中，不是那个批注质量。**
+
+因此执行 L0 的 Agent8 时：问题清单、统计、报告结构一律按 `prompts/L0_original/08_result_summary/prompt.md`；**批注与问题清单的取材、格式、锚定规则改用 `prompts/08_result_summary/prompt.md` 的"plan_annotated.docx 必须"整节**（四字段 + 判定标签行、锚定 `quoted_text` 精确字符区间、禁止流程元数据、真批注三件套自检）。
+
+#### 字段补齐规则（L0 专用，因为原始 5A 不产出这些字段）
+
+原始 5A 的 issue 只有五个字段，四字段模板需要的 `quoted_text`、`article`、`clause_text`、`suggestion`都缺。**L0 的 Agent8 必须补齐，并逐条标明哪些字段是补的**：
+
+| 缺失字段 | 补齐方式 | 标记 |
+|----------|----------|------|
+| `quoted_text` | 从该 `clause_id` 的条款原文中**逐字摘取**最能体现该问题的一句（≥10 字）。这是摘取不是创作，文字必须能在预案中精确匹配 | `derived.quoted_text: true` |
+| `article` + `clause_text` | 用 `reference` + 问题描述重跑知识库 Top20 检索，定位到具体条号与原文（≥30 字） | `derived.article: true` |
+| `suggestion` | 依据已确定的法条，写出法律层面的修订方向 | `derived.suggestion: true` |
+
+补不到的情况按下表退化，**禁止编造**：
+
+- `reference` 不在知识库内（L0 有 34 条属于此类）→ `article`/`clause_text` 取不到 → 依据行只写 `《法规全称》`，另起一行写 `条款号未能在本地知识库中定位`，并在 `annotation_log.json` 记 `basis_not_in_kb: true`。这是如实呈现，不是编造。
+- `quoted_text` 摘不出 → 退化为锚定整段，记 `anchor_fallback: paragraph`。
+- `suggestion` 因依据不明而写不出 → 写 `需补充该主题法规后方可给出依法修订方向`。
+
+`annotation_log.json` 必须统计：批注总数、`derived.*` 各项条数、`basis_not_in_kb` 条数、`anchor_fallback` 条数。这几个数字就是 L0 结果可信度的量化说明。
+
+#### 选 L0 前必须告知用户
+
+1. **L0 会产出约 52 条问题，其中约 34 条的依据不在 `laws/` 内**（原始 5A 规则自带的四部法规本地没有）。这些问题在本系统的证据体系内不成立，批注里会如实标注"条款号未能在本地知识库中定位"。
+2. **52 条里只有约 10 个不同缺陷**，最重复的一条出现 19 次（同一规则在 19 个条款各发一个编号）。L0 不做跨条款聚合，所以数量虚高是预期行为。
+3. **L0 是危化品专用的**：原始 5A 的 10 条规则全部围绕危化品，审其他类型预案会大面积漏检。非危化品预案请用 L1 以上。
 
 L1/L2/L3 继续读本文件，按下面的开关执行。
 
