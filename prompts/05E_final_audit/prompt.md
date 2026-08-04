@@ -34,7 +34,10 @@
 10. 对 5A 与 5B 不一致的记录，结合 5C 审计与 5D 复核做最终裁定。
 11. **必备要素覆盖终审**：`clauses.json` 的 `uncovered_elements` 中每个要素，是否已被 5A/5B 转化为"缺失法定必备内容"问题；若某要素确属法定必备（对照 `plan_profile.required_elements` 中 `necessity: mandatory`）却无对应问题 → 补记为漏审风险 `audit_gap`，列入 `final_audit_report` 并**明确标注需人工确认**（本阶段不自造问题编号）。
 12. **依据状态终审**：引用已废止/已修订法规的问题标 `basis_status_warning` 并降置信度。
-13. **知识库内依据终审（硬门禁）**：逐条核对每个问题的 `reference` 是否能在 `law_metadata.json` 中按 `law_name` 精确匹配。出现任何 `reference_not_in_kb: true` 的问题 → **判为 5C 门禁失效，停止并输出错误报告**，不得让其进入 Agent6/7/8。
+13. **知识库内依据终审（硬门禁）**：分正反两步查。**只查 `reference_not_in_kb: true` 是死代码**——5C 是静默剔除的，被剔问题根本到不了本阶段。
+    - **正向**：核对最终清单里每个问题 `legal_basis` 的**每一条**依据，`reference` 是否都能在 `law_metadata.json` 精确匹配且 `usable_for_review: true`。出现库外依据 → 判 5C 的 A 级门禁失效，停止并输出错误报告。
+    - **反向**：核对 `cross_audit_log.json` 的数量等式（`raw_issues_in - a_level_rejected - b_level_rejected_after_retry - merged_pairs = final_issues`）与 `rejected_problems.json` 条数、`kb_gap_report.json` 登记数是否自洽。对不上说明有问题被静默丢弃，判审计不通过。
+    - **告警传递**：`cross_audit_log.json` 存在 `upstream_basis_violation_alert` 时必须在 `final_audit_report` 中原样列出，指明是 5A 还是 5B 违反了"取不到库内依据就不生成问题"的约束。不得因"已剔除不影响交付"而省略——上游批量产出无依据问题这件事本身必须让用户看见。
 14. **聚合规范终审**：同一 `rule_id` + 同一 `type` + 同一 `reference` 的问题是否出现多个编号。若同一检查点在多个条款上被拆成多个问题编号 → 判为聚合失效，列入 `final_audit_report` 要求 5C 重新聚合。
 15. **修订建议完备性**：每个 fail 问题是否有非空 `suggestion`。缺失即判为字段不完整。
 16. **依据缺口交叉核对**：`kb_gap_report.json` 中的 `blocked_checkpoints` 是否与最终问题清单互斥——同一检查点不应既"因无依据被阻断"又"产生了问题"。冲突项列入 `final_audit_report`。

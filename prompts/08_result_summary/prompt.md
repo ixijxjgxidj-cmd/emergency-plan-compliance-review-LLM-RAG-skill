@@ -62,6 +62,7 @@
       "clause_text": "",
       "quoted_text": "",
       "issue_type": "",
+      "challenged_citation": null,
       "description": "",
       "severity": "high",
       "confidence": "high",

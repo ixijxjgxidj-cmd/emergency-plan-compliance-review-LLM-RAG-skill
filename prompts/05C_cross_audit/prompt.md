@@ -41,19 +41,67 @@
 
 ### Step 3 依据合法性门禁（**在合并去重之前执行**）
 
-这一步是硬门禁，不是标注。逐条检查每个候选问题：
+门禁分两级。**混用一个动作处理两种性质的缺陷，会把可修复的问题当不成立的问题扔掉**——这是上一版的实际缺陷。
 
-1. `reference` 能否在 `law_metadata.json` 中按 `law_name` 精确匹配到一条记录？
-2. 该记录的 `usable_for_review` 是否为 `true`？
-3. `article` 是否为具体条号，`clause_text` 是否 ≥30 字且能在知识库中找到对应原文？
-4. `quoted_text`（错误原文）是否非空、≥10 字，且能在该 `clause_id` 的条款原文中精确匹配？
+#### A 级：依据合法性（不过即剔除）
+
+问题是否有**知识库内的**法规依据支撑。
+
+**按数组判定，不是按单个字段判定。** 遍历该问题 `legal_basis` 的全部条目（`reference` 只是其中主依据），逐条检查：
+
+1. 该条目的 `reference` 能否在 `law_metadata.json` 中按 `law_name` 精确匹配？
+2. 匹配到的记录 `usable_for_review` 是否为 `true`？
+
+**任一条目两项全过 → A 级通过**，并把未通过的库外条目从 `legal_basis` 中摘除、记入 `kb_gap_report.json`（保留"这条依据本地没有"的事实），用库内条目作为该问题的正式依据。
+
+**全部条目都不过 → 剔除**，写入 `./output/rejected_problems.json`，`reject_reason` 取 `no_basis_in_kb` / `law_unusable`，并在 `kb_gap_report.json` 登记依据缺口。
+
+> 为什么必须遍历数组：实跑中有问题同时引了《突发事件应对法》第八十六条（库外）与《江西省突发事件应对条例》第四十九条（库内），只查单个 `reference` 字段就把它整条剔掉了，而它明明有库内的替代依据。
+
+#### `引用法规或条款错误` 类型的特殊处理（**A 级判定前先做**）
+
+这个类型的语义与其他类型相反：被写进 `reference` 的往往是**预案里那个被质疑的引用**，不是支撑本发现的权威依据。直接套 A 级会把真问题剔掉。
+
+因此该类型必须拆成两个字段：
+
+| 字段 | 含义 | 参与门禁 |
+|------|------|----------|
+| `challenged_citation` | 预案中被质疑的那个引用（法规名/文号/条款号） | **不参与** |
+| `reference` | 支撑"该引用有误"这一判断的知识库内依据 | 参与 A 级 |
+
+- 上游把被质疑引用错填进 `reference` 时，5C 负责搬到 `challenged_citation`，再重新取 `reference`。
+- 取不到库内依据支撑（例如被质疑的是一份本地没有的上级预案，无从判断其名称是否准确）→ 这不是"引用错误"问题，而是**无法核验**：剔除，`reject_reason: citation_unverifiable`，转入 `kb_gap_report.json`。
+- 库内有依据（例如预案引"《安全生产法》第九十九条"而库内该法无此条）→ A 级通过，`reference` 填《中华人民共和国安全生产法》。
+
+#### B 级：字段完备性（不过则退回补齐，不直接剔除）
+
+A 级通过后再查。这些缺陷是"判断可能对但没写全"，不是"判断不成立"：
+
+3. `article` 是否为具体条号？`clause_text` 是否 ≥30 字且能在知识库中找到对应原文？
+4. `quoted_text` 是否非空、≥10 字，且能在该 `clause_id` 的条款原文中精确匹配？
 5. `suggestion` 是否非空且为法律层面的修订方向？
 
-**五项全过 → 进入合并流程。任一不过 → 移出问题清单**，写入 `./output/rejected_problems.json`，记 `reject_reason`（`reference_not_in_kb` / `law_unusable` / `no_article` / `no_clause_text` / `text_not_found_in_kb` / `no_quoted_text` / `quoted_text_not_in_plan` / `no_suggestion`），并同步在 `kb_gap_report.json` 中登记一条依据缺口。
+**任一不过 → 标 `gate_status: needs_completion`**，列出缺失字段，**重跑该问题的 Top20 检索尝试补齐**：
 
-被移出的问题**不占用 `P-` 编号**，不进入 `review_results.json`，不流向 5D/5E/6/7。
+- 补齐成功 → `gate_status: passed`，正常进入合并流程。
+- 补齐失败 → 才剔除，`reject_reason` 用 `no_article_after_retry` / `no_clause_text_after_retry` / `no_quoted_text_after_retry` / `no_suggestion_after_retry`，与 A 级的"无依据"在语义上明确区分。
 
-> 为什么必须是"移出"而不是"降为低置信度"：实跑中 52 个问题里 34 个引用了知识库外的法规（《危险化学品安全管理条例》《GB/T 29639》《GB 30077》《突发环境事件应急管理办法》）。当时只把它们标为低置信度继续下传，结果 Agent6 花 36 次复核标 `insufficient_basis_outside_kb`、Agent7 花 27 次联网核验标 `unverified`，最终报告里 65% 的问题是不成立的——审查结论被无依据条目稀释，用户无法分辨哪 18 条是真的。**无依据的问题不是低置信度问题，它不是问题。**
+被剔除的问题一律**不占用 `P-` 编号**，不进入 `review_results.json`，不流向 5C2/5D/5E/6/7。
+
+#### 上游违约告警（**必须执行**）
+
+5A 已被明令要求"取不到库内依据就记 `advisory`，不生成问题"，5B 同理。**因此在正常流程中 A 级门禁应拦到约 0 条。**
+
+统计 `a_level_rejected / raw_candidate_count`：
+
+- 比率 > 0.1 → 在 `cross_audit_log.json` 与 `review_log.json` 写入 `upstream_basis_violation_alert`，明确指出是 5A 或 5B 违反了该约束（列出违约问题的 `origin` 与涉及的库外法规名），并在 Agent8 报告中披露。
+- **门禁拦到东西不是门禁在正常工作，是上游失效的信号。** 静默剔除会把这个信号吞掉——上一版就是这样，导致 5E 那条"出现 `reference_not_in_kb` 即判门禁失效"的检查永远收不到输入，成了死代码。
+
+<!-- GATE-END -->
+
+> 为什么 A 级必须是"剔除"而不是"降为低置信度"：实跑中 52 个问题里 34 个引用了知识库外的法规（《危险化学品安全管理条例》《GB/T 29639》《GB 30077》《突发环境事件应急管理办法》）。当时只把它们标为低置信度继续下传，结果 Agent6 花 36 次复核标 `insufficient_basis_outside_kb`、Agent7 花 27 次联网核验标 `unverified`，最终报告里 65% 的问题是不成立的——审查结论被无依据条目稀释，用户无法分辨哪 18 条是真的。**无依据的问题不是低置信度问题，它不是问题。**
+>
+> 但反过来也不能一刀切：B 级那三项（条款号、错误原文、修订建议）缺失时，判断本身可能是对的，只是没写全。上一版把这五项混成一个剔除动作，等于把可修复的缺陷也当成不成立的问题扔掉。
 
 ### Step 4 问题合并去重
 
@@ -84,7 +132,8 @@
 
 - 核查引用法规的 `effective_status`；已废止/已修订 → 标 `basis_status_warning`。
 - 核查编号连续性与字段完整性。
-- 统计 Step 3 的移出数量，写入 `cross_audit_log.json` 的 `rejected_count`。
+- 统计 Step 3 各级结果写入 `cross_audit_log.json`：`a_level_rejected`、`b_level_needs_completion`、`b_level_completed`、`b_level_rejected_after_retry`、`basis_trimmed_to_kb_only`、`citation_field_relocated`。
+- `a_level_rejected / raw_issues_in > 0.1` 时写入 `upstream_basis_violation_alert`。
 
 ## review_results.json 每条记录至少包括
 
@@ -113,8 +162,13 @@
   "5b_only_fail": 0,
   "errors": 0,
   "raw_issues_in": 0,
-  "rejected_reference_not_in_kb": 0,
-  "rejected_incomplete_basis": 0,
+  "a_level_rejected": 0,
+  "b_level_needs_completion": 0,
+  "b_level_completed": 0,
+  "b_level_rejected_after_retry": 0,
+  "basis_trimmed_to_kb_only": 0,
+  "citation_field_relocated": 0,
+  "upstream_basis_violation_alert": null,
   "systemic_findings": 0,
   "clause_level_findings": 0,
   "final_issues": 0,
@@ -126,17 +180,21 @@
 }
 ```
 
+字段含义：`a_level_rejected` 无库内依据被剔；`b_level_needs_completion` 字段不全被退回补齐；其中 `b_level_completed` 补齐成功、`b_level_rejected_after_retry` 补不齐才剔；`basis_trimmed_to_kb_only` 有库内依据但摘掉了库外条目的问题数；`citation_field_relocated` 把被质疑引用从 `reference` 搬到 `challenged_citation` 的问题数。
+
 `raw_issues_in` → `final_issues` 的每一次减少都必须在 `rejected_details` 或 `merged_pairs` 中有对应记录，数量必须自洽：
 
 ```
 raw_issues_in
-  - rejected_reference_not_in_kb
-  - rejected_incomplete_basis
+  - a_level_rejected
+  - b_level_rejected_after_retry
   - merged_pairs
   = final_issues
 ```
 
-对不上就是审计逻辑有漏，必须停下报错，不得凑数。
+注意 `b_level_needs_completion` **不**出现在这个等式里——退回补齐不是剔除，补齐成功的问题仍在清单内。等式对不上就是审计逻辑有漏，必须停下报错，不得凑数。
+
+`a_level_rejected / raw_issues_in > 0.1` 时必须写入 `upstream_basis_violation_alert`，内容含违约问题的 `origin`（`5A:P-xxx` / `5B:P2-xxx`）与涉及的库外法规名清单。
 
 ## 禁止
 

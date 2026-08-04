@@ -201,7 +201,8 @@
 - `affected_clauses`：命中条款数组
 - `clause_count`
 - `quoted_text`：**错误原文**，从预案正文逐字摘出的出错文字（≥10 字），必须能在原文中精确匹配；多条款问题取首个条款中最具代表性的那句
-- `reference`（法规全称，须命中 `law_metadata.json`）
+- `reference`（**支撑本发现的库内依据**法规全称，须命中 `law_metadata.json`）
+- `challenged_citation`（仅 `引用法规或条款错误` 类型填：预案中被质疑的那个引用；不参与依据门禁）
 - `article`（具体条款号，禁止留空）
 - `clause_text`（法规条文原文摘录 ≥30 字，须来自知识库）
 - `basis_source`（依据所在的本地法规文件名）
